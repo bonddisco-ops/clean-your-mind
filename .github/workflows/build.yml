@@ -35,7 +35,15 @@ jobs:
 
       - name: Build
         shell: bash
-        run: cmake --build build --config Release --target CleanYourMind --parallel 4
+        run: |
+          set -o pipefail
+          cmake --build build --config Release --target CleanYourMind --parallel 4 2>&1 | tee build.log
+
+      - name: Show compile errors
+        if: failure()
+        shell: bash
+        run: |
+          grep -E "error|Error" build.log | grep -v "warning" | head -40 | while IFS= read -r line; do echo "::error::$line"; done
 
       - name: Collect files
         shell: bash
