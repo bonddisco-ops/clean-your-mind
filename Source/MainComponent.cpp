@@ -406,8 +406,8 @@ void MainComponent::doQuarantine (const String& key)
     if (p == nullptr)
         return;
     const auto name = p->name;
-    const auto msg = tr ("Убрать ", "Move ") + name + tr (" в карантин?\n\nФайлы переедут в папку программы, Bitwig перестанет их видеть. Вернуть можно во вкладке «Карантин».",
-                                                        " to quarantine?\n\nIts files move into the app's folder and Bitwig won't see them. You can restore it from the Quarantine tab.");
+    const auto msg = tr ("Убрать ", "Move ") + name + tr (" в карантин?\n\nФайлы переедут в папку программы, DAW перестанет их видеть. Вернуть можно во вкладке «Карантин».",
+                                                        " to quarantine?\n\nIts files move into the app's folder and your DAW won't see them. You can restore it from the Quarantine tab.");
     AlertWindow::showOkCancelBox (MessageBoxIconType::QuestionIcon, tr ("Карантин", "Quarantine"), msg,
                                   tr ("Убрать", "Move"), tr ("Отмена", "Cancel"), this,
                                   ModalCallbackFunction::create ([this, key] (int r)

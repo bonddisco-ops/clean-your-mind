@@ -10,7 +10,7 @@ FolderList::FolderList (AppState& a, bool proj) : app (a), projects (proj)
     add.getProperties().set ("pill", false);
     add.onClick = [this]
     {
-        chooser = std::make_unique<FileChooser> (projects ? tr ("Папка с проектами Bitwig", "Bitwig projects folder")
+        chooser = std::make_unique<FileChooser> (projects ? tr ("Папка с проектами", "Projects folder")
                                                           : tr ("Папка с плагинами", "Plugin folder"));
         chooser->launchAsync (FileBrowserComponent::openMode | FileBrowserComponent::canSelectDirectories, [this] (const FileChooser& fc)
         {
@@ -61,7 +61,7 @@ void FolderList::paint (Graphics& g)
     if (f.isEmpty())
     {
         g.setColour (c.mute);
-        g.drawText (projects ? tr ("[папка с проектами Bitwig]", "[your Bitwig projects folder]") : tr ("нет папок", "no folders"),
+        g.drawText (projects ? tr ("[папка с проектами]", "[your projects folder]") : tr ("нет папок", "no folders"),
                     rowBounds (0), Justification::centredLeft, true);
     }
     for (int i = 0; i < f.size() && i < maxRows; ++i)
@@ -88,7 +88,7 @@ void FolderList::paint (Graphics& g)
     }
     g.setColour (c.mute);
     g.setFont (uiFont (11.0f));
-    g.drawFittedText (projects ? tr ("Читаю все .bwproject внутри, бэкапы пропускаю.", "Reads every .bwproject inside, skips backups.")
+    g.drawFittedText (projects ? tr ("Пока читаю проекты Bitwig (.bwproject), бэкапы пропускаю.", "Reads Bitwig projects (.bwproject) for now, skips backups.")
                                : tr ("Розовые нашёл сам, серые добавил ты. Плагины не запускаю, только смотрю файлы.",
                                      "Pink ones were found automatically. Plugins are never launched, only their files are read."),
                       Rectangle<int> (16, getHeight() - 38, getWidth() - 32, 30), Justification::centredLeft, 2);
@@ -398,8 +398,8 @@ void StatsPage::paint (Graphics& g)
             if (filter == 5) msg = tr ("Карантин пуст. Сюда попадают плагины, которые ты убрал из папок: их можно вернуть одной кнопкой.",
                                        "Quarantine is empty. Plugins you move out end up here and can be restored with one click.");
             else if (app.lib.projectCache.empty() && filter != 0)
-                msg = tr ("Добавь справа папку с проектами Bitwig, и я посчитаю, что ты реально используешь.",
-                          "Add your Bitwig projects folder on the right and I'll count what you actually use.");
+                msg = tr ("Добавь справа папку с проектами, и я посчитаю, что ты реально используешь.",
+                          "Add your projects folder on the right and I'll count what you actually use.");
             else msg = tr ("Тут пусто", "Nothing here");
             g.drawFittedText (msg, list.getBounds().reduced (30, 20).withHeight (60), Justification::centred, 3);
         }

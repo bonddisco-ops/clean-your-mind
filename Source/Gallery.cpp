@@ -127,7 +127,7 @@ void PluginCard::paint (Graphics& g)
     // format badge
     {
         auto text = p->formatsText();
-        if (p->isShellOnly()) text = tr ("WAVES · из браузера Bitwig", "WAVES · use Bitwig's browser");
+        if (p->isShellOnly()) text = tr ("WAVES · из браузера DAW", "WAVES · use the DAW's browser");
         g.setFont (uiFont (10.0f, true, 0.08f));
         const float bw = (float) GlyphArrangement::getStringWidthInt (g.getCurrentFont(), text) + 14.0f;
         const Rectangle<float> badge (8.0f, 8.0f, jmin (bw, (float) getWidth() - 50.0f), 18.0f);
@@ -215,10 +215,10 @@ void PluginCard::mouseDrag (const MouseEvent& e)
     const auto* f = p->fileForDrag (app.lib.formatPriority);
     if (f == nullptr)
     {
-        app.toast (p->isShellOnly() ? tr ("Waves лежат внутри WaveShell: добавь их из браузера Bitwig.",
-                                          "Waves plugins live inside WaveShell: add them from Bitwig's browser.")
-                                    : tr ("Этот плагин только в AU: Bitwig его не откроет.",
-                                          "This plugin is AU only: Bitwig can't load it."));
+        app.toast (p->isShellOnly() ? tr ("Waves лежат внутри WaveShell: добавь их из браузера DAW.",
+                                          "Waves plugins live inside WaveShell: add them from the DAW's browser.")
+                                    : tr ("Этот плагин только в AU: перетащить не выйдет, бери его из браузера DAW.",
+                                          "This plugin is AU only: it can't be dragged, use the DAW's browser."));
         return;
     }
     DragAndDropContainer::performExternalDragDropOfFiles ({ dragPathFor (*f).getFullPathName() }, false, this);
@@ -552,8 +552,8 @@ void GalleryPage::refresh()
     status = tr ("Плагинов: ", "Plugins: ") + String ((int) app.lib.plugins.size())
            + tr (" · инструментов ", " · instruments ") + String (instCount)
            + tr (" · с картинкой ", " · with picture ") + String (withImg)
-           + tr ("   Хватай карточку и тащи на трек в Bitwig. Скрин кидай прямо на карточку или жми Ctrl+V над ней.",
-                 "   Drag a card onto a Bitwig track. Drop a screenshot on a card, or hover it and press Ctrl+V.");
+           + tr ("   Хватай карточку и тащи на трек в DAW. Скрин кидай прямо на карточку или жми Ctrl+V над ней.",
+                 "   Drag a card onto a track in your DAW. Drop a screenshot on a card, or hover it and press Ctrl+V.");
     repaint();
 }
 
