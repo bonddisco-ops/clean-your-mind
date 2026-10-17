@@ -27,6 +27,29 @@ static String monogram (const String& name)
     return m.substring (0, 3);
 }
 
+// On Windows a VST3 is usually a folder; DAWs want the binary inside it
+// (Name.vst3\Contents\x86_64-win\Name.vst3), the same path Bitwig stores in projects.
+static File dragPathFor (const PluginFile& f)
+{
+   #if JUCE_WINDOWS
+    if (f.format == Format::VST3 && f.file.isDirectory())
+    {
+        const auto contents = f.file.getChildFile ("Contents");
+        for (auto* arch : { "x86_64-win", "arm64x-win", "arm64ec-win" })
+        {
+            const auto bin = contents.getChildFile (arch).getChildFile (f.file.getFileName());
+            if (bin.existsAsFile())
+                return bin;
+        }
+        // any .vst3 binary inside a *-win folder
+        for (const auto& e : RangedDirectoryIterator (contents, true, "*.vst3", File::findFiles))
+            if (e.getFile().getParentDirectory().getFileName().endsWithIgnoreCase ("-win"))
+                return e.getFile();
+    }
+   #endif
+    return f.file;
+}
+
 //==============================================================================
 PluginCard::PluginCard (AppState& a, const String& k) : key (k), app (a)
 {
@@ -198,7 +221,7 @@ void PluginCard::mouseDrag (const MouseEvent& e)
                                           "This plugin is AU only: Bitwig can't load it."));
         return;
     }
-    DragAndDropContainer::performExternalDragDropOfFiles ({ f->file.getFullPathName() }, false, this);
+    DragAndDropContainer::performExternalDragDropOfFiles ({ dragPathFor (*f).getFullPathName() }, false, this);
 }
 
 void PluginCard::mouseUp (const MouseEvent& e)
