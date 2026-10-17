@@ -336,9 +336,10 @@ void MainComponent::timerCallback()
 void MainComponent::openCrop (const String& key, Image img, bool isNew)
 {
     crop = std::make_unique<CropEditor> (app, key, img, isNew);
-    crop->onClose = [this]
+    SafePointer<MainComponent> safeThis (this);
+    crop->onClose = [safeThis]
     {
-        MessageManager::callAsync ([safe = SafePointer<MainComponent> (this)]
+        MessageManager::callAsync ([safe = safeThis]
         {
             if (safe != nullptr)
             {
