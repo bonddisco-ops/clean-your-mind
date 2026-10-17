@@ -72,6 +72,8 @@ int main (int argc, char** argv)
                      "Primal Rage Lab/Voice Fucker.vst3", "Primal Rage Lab/Crumble.vst3" })
         vst3.getChildFile (n).getChildFile ("Contents").createDirectory();
     vst3.getChildFile ("Serum2.vst3/Contents/Resources").createDirectory();
+    vst3.getChildFile ("Serum2/Contents/x86_64-win").createDirectory();   // stale leftover folder, must be ignored
+    vst3.getChildFile ("Serum2/Contents/x86_64-win/Serum2.vst3").create();
     vst3.getChildFile ("Serum2.vst3/Contents/Resources/moduleinfo.json").replaceWithText (
         R"({ "Name": "Serum2", "Factory Info": { "Vendor": "Xfer Records", }, "Classes": [ { "CID": "x", "Category": "Audio Module Class", "Name": "Serum 2", "Vendor": "Xfer Records", "Sub Categories": [ "Instrument", "Synth", ], }, ], })");
     for (auto* n : { "FabFilter/FabFilter Pro-Q 4.clap", "FabFilter/FabFilter Pro-Q 3.clap" })

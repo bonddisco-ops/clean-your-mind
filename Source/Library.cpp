@@ -364,7 +364,9 @@ static void walk (const File& dir, const File& root, int depth, std::vector<Plug
                 addPluginFile (out, f, Format::VST2, root, is32);
             continue;
         }
-        if (isDir && ! f.isSymbolicLink())
+        // "Contents" is the inside of a plugin bundle. A folder that holds one without the
+        // .vst3/.clap name (a leftover from an old install) isn't loaded by DAWs, so skip it too.
+        if (isDir && ! f.isSymbolicLink() && ! f.getFileName().equalsIgnoreCase ("Contents"))
             walk (f, root, depth + 1, out, seen, shouldExit);
     }
 }
