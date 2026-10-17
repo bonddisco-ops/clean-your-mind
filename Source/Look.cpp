@@ -290,6 +290,10 @@ Path iconPath (Icon i)
             p.startNewSubPath (5, 9); p.lineTo (5, 20); p.lineTo (19, 20); p.lineTo (19, 9);
             p.startNewSubPath (10, 13); p.lineTo (14, 13);
             break;
+        case Icon::Ban:
+            p.addEllipse (3.5f, 3.5f, 17, 17);
+            p.startNewSubPath (6.2f, 17.8f); p.lineTo (17.8f, 6.2f);
+            break;
         case Icon::Globe:
             p.addEllipse (3, 3, 18, 18);
             p.startNewSubPath (3, 12); p.lineTo (21, 12);
@@ -342,6 +346,36 @@ void IconButton::paintButton (Graphics& g, bool highlighted, bool down)
 }
 
 //==============================================================================
+void askForText (const String& title, const String& message, const String& initial, std::function<void (const String&)> onOk)
+{
+    auto* aw = new AlertWindow (title, message, MessageBoxIconType::NoIcon);
+    aw->addTextEditor ("text", initial);
+    aw->addButton ("OK", 1, KeyPress (KeyPress::returnKey));
+    aw->addButton (tr ("Отмена", "Cancel"), 0, KeyPress (KeyPress::escapeKey));
+    aw->enterModalState (true, ModalCallbackFunction::create ([aw, onOk] (int r)
+    {
+        std::unique_ptr<AlertWindow> owner (aw);
+        if (r == 1 && onOk)
+            onOk (aw->getTextEditorContents ("text").trim());
+    }), false);
+}
+
+void AppState::newCategory (std::function<void (const String&)> then)
+{
+    askForText (tr ("Новая категория", "New category"),
+                tr ("Как назовём? Потом раздавай её плагинам правым кликом по карточке.",
+                    "Name it. Then give it to plugins with a right-click on a card."),
+                {}, [this, then] (const String& name)
+    {
+        if (name.isEmpty())
+            return;
+        if (! lib.addCategory (name) && ! allCategories().contains (name))
+            return;
+        if (categoriesChanged) categoriesChanged();
+        if (then) then (name);
+    });
+}
+
 Image AppState::thumbFor (const String& key)
 {
     auto it = thumbs.find (key);

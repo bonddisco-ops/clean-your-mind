@@ -24,7 +24,18 @@ static Format formatFromName (const String& s)
     return Format::VST3;
 }
 
-const StringArray& allCategories()
+static const StringArray* customCats = nullptr;
+
+StringArray allCategories()
+{
+    StringArray c (builtInCategories());
+    if (customCats != nullptr)
+        for (auto& x : *customCats)
+            c.addIfNotAlreadyThere (x);
+    return c;
+}
+
+const StringArray& builtInCategories()
 {
     static const StringArray c { String::fromUTF8 ("Синты"), "EQ", String::fromUTF8 ("Динамика"), String::fromUTF8 ("Грязь"),
                                  String::fromUTF8 ("Модуляция"), String::fromUTF8 ("Пространство"), String::fromUTF8 ("Анализ"),
@@ -59,38 +70,38 @@ PluginType Plugin::type() const
 String Plugin::autoCategory() const
 {
     if (type() == PluginType::Instrument)
-        return allCategories()[0];
+        return builtInCategories()[0];
 
     for (const auto& f : files)
         for (const auto& s : f.subCategories)
         {
             const auto l = s.toLowerCase();
             if (l == "eq") return "EQ";
-            if (l == "dynamics") return allCategories()[2];
-            if (l == "distortion") return allCategories()[3];
-            if (l == "modulation" || l == "pitch shift") return allCategories()[4];
-            if (l == "reverb" || l == "delay" || l == "spatial") return allCategories()[5];
-            if (l == "analyzer") return allCategories()[6];
+            if (l == "dynamics") return builtInCategories()[2];
+            if (l == "distortion") return builtInCategories()[3];
+            if (l == "modulation" || l == "pitch shift") return builtInCategories()[4];
+            if (l == "reverb" || l == "delay" || l == "spatial") return builtInCategories()[5];
+            if (l == "analyzer") return builtInCategories()[6];
         }
 
     const auto n = name.toLowerCase();
     if (containsAny (n, { "span", "meter", "scope", "analy", "metric", "tonal balance", "insight", "spectrum", "correlat" }))
-        return allCategories()[6];
+        return builtInCategories()[6];
     if (containsAny (n, { "pro-q", " eq", "eq ", "equilib", "equaliz", "pultec", "kirchhoff", "eq8" }) || n.startsWith ("eq"))
         return "EQ";
     if (containsAny (n, { "shaperbox", "turnado", "pancake", "chorus", "flang", "phaser", "tremol", "lfo", "alterboy",
                           "pitch", "dimension", "vibrato", "glitch", "stutter", "gross beat", "effectrix" }))
-        return allCategories()[4];
+        return builtInCategories()[4];
     if (containsAny (n, { "comp", "limit", "pro-l", "pro-c", "pro-mb", "ott", "dynamic", "kickstart", "duck", "gate",
                           "clipper", "transient", "volume", "maximiz", "multiband", "glue", "squash" }))
-        return allCategories()[2];
+        return builtInCategories()[2];
     if (containsAny (n, { "decap", "crush", "distort", "satur", "corrosion", "waveshaper", "drive", "fuzz", "bitcr", "tape",
                           "studer", "camel", "trash", "saturn", "devil", "heat", "tube", "crumble", "destroy", "dirt" }))
-        return allCategories()[3];
+        return builtInCategories()[3];
     if (containsAny (n, { "reverb", "verb", "room", "delay", "echo", "valhalla", "cinematic", "imager", "stereo", "width",
                           "space", "spatial", "hall", "plate", "shimmer", "microshift", "haas", "wider" }))
-        return allCategories()[5];
-    return allCategories()[7];
+        return builtInCategories()[5];
+    return builtInCategories()[7];
 }
 
 String Plugin::category() const { return userCategory.isNotEmpty() ? userCategory : autoCategory(); }
@@ -544,7 +555,31 @@ std::vector<ProjectRecord> scanProjects (const Array<File>& roots, const std::ma
 //==============================================================================
 Library::Library()
 {
+    customCats = &customCategories;
     loadAll();
+}
+
+bool Library::addCategory (const String& raw)
+{
+    const auto name = raw.trim();
+    if (name.isEmpty() || allCategories().contains (name))
+        return false;
+    customCategories.add (name);
+    saveSettings();
+    return true;
+}
+
+void Library::removeCategory (const String& name)
+{
+    customCategories.removeString (name);
+    for (auto& p : plugins)
+        if (p.userCategory == name)
+            p.userCategory = {};
+    for (auto& [k, m] : meta)
+        if (m.category == name)
+            m.category = {};
+    saveSettings();
+    saveUserData();
 }
 
 File Library::dataDir() const
@@ -621,6 +656,11 @@ void Library::loadAll()
         themeName = s.getProperty ("theme", "Asphalt").toString();
         lang = s.getProperty ("lang", "ru").toString();
         lastScan = Time ((int64) s.getProperty ("lastScan", 0));
+        if (auto* cc = s["categories"].getArray())
+            for (auto& x : *cc)
+                if (x.toString().trim().isNotEmpty()) customCategories.addIfNotAlreadyThere (x.toString().trim());
+        galleryZoom = jlimit (0.6f, 2.5f, (float) (double) s.getProperty ("galleryZoom", 1.0));
+        statsZoom = jlimit (0.6f, 2.5f, (float) (double) s.getProperty ("statsZoom", 1.0));
     }
     else
     {
@@ -633,6 +673,7 @@ void Library::loadAll()
         {
             UserMeta m;
             m.favorite = p.value.getProperty ("fav", false);
+            m.hidden = p.value.getProperty ("hid", false);
             m.type = p.value.getProperty ("type", -1);
             m.category = p.value.getProperty ("cat", "").toString();
             m.dragFormat = p.value.getProperty ("drag", "").toString();
@@ -678,6 +719,11 @@ void Library::saveSettings()
     o->setProperty ("theme", themeName);
     o->setProperty ("lang", lang);
     o->setProperty ("lastScan", lastScan.toMilliseconds());
+    Array<var> cats;
+    for (auto& c : customCategories) cats.add (c);
+    o->setProperty ("categories", cats);
+    o->setProperty ("galleryZoom", galleryZoom);
+    o->setProperty ("statsZoom", statsZoom);
     dataDir().getChildFile ("settings.json").replaceWithText (JSON::toString (var (o)));
 }
 
@@ -687,6 +733,7 @@ void Library::captureMeta()
     {
         auto& m = meta[p.key];
         m.favorite = p.favorite;
+        m.hidden = p.hidden;
         m.type = (int) p.userType;
         m.category = p.userCategory;
         m.dragFormat = p.dragFormat;
@@ -707,12 +754,13 @@ void Library::saveUserData()
         if (it != meta.end())
         {
             const auto& m = it->second;
-            if (! m.favorite && m.type < 0 && m.category.isEmpty() && m.dragFormat.isEmpty() && imageStates.count (k) == 0)
+            if (! m.favorite && ! m.hidden && m.type < 0 && m.category.isEmpty() && m.dragFormat.isEmpty() && imageStates.count (k) == 0)
             {
                 delete e;
                 continue;
             }
             e->setProperty ("fav", m.favorite);
+            if (m.hidden) e->setProperty ("hid", true);
             e->setProperty ("type", m.type);
             e->setProperty ("cat", m.category);
             e->setProperty ("drag", m.dragFormat);
@@ -799,6 +847,7 @@ void Library::applyScan (ScanResult&& r)
         if (it != meta.end())
         {
             p.favorite = it->second.favorite;
+            p.hidden = it->second.hidden;
             p.userType = (PluginType) it->second.type;
             p.userCategory = it->second.category;
             p.dragFormat = it->second.dragFormat;

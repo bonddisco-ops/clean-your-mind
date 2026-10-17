@@ -99,10 +99,20 @@ int main (int argc, char** argv)
                               .getChildFile ("Primal Rage Lab").getChildFile ("Clean Your Mind");
     settings.deleteRecursively();
     settings.createDirectory();
+    String extra;
+    for (int i = 1; i <= 6; ++i)
+    {
+        const auto d = root.getChildFile ("More Plugins " + String (i) + "/Some/Deep/Vendor Folder/With A Long Name");
+        d.createDirectory();
+        extra << ",\"" << d.getFullPathName() << "\"";
+    }
     settings.getChildFile ("settings.json").replaceWithText (
         "{\"pluginFolders\":[\"" + vst3.getFullPathName() + "\",\"" + clap.getFullPathName() + "\",\"" + vst2.getFullPathName()
-        + "\"],\"projectFolders\":[\"" + projects.getFullPathName() + "\"],\"theme\":\"Asphalt\",\"lang\":\"" + (argc > 4 ? argv[4] : "ru") + "\"}");
-    settings.getChildFile ("userdata.json").replaceWithText ("{\"fabfilterproq4\":{\"fav\":true},\"ott\":{\"fav\":true}}");
+        + "\"" + extra + "],\"projectFolders\":[\"" + projects.getFullPathName() + "\"],\"theme\":\"Asphalt\",\"lang\":\"" + (argc > 4 ? argv[4] : "ru")
+        + "\",\"categories\":[\"" + String::fromUTF8 ("Для вокала") + "\"]}");
+    settings.getChildFile ("userdata.json").replaceWithText (String::fromUTF8 (
+        "{\"fabfilterproq4\":{\"fav\":true},\"ott\":{\"fav\":true},\"vital\":{\"hid\":true},\"oldfreereverb\":{\"hid\":true},"
+        "\"valhallaroom\":{\"cat\":\"Для вокала\"}}"));
 
     // 4. the app
     auto mc = std::make_unique<MainComponent>();
@@ -171,6 +181,71 @@ int main (int argc, char** argv)
         if (auto* b = findButton (*mc, tr ("Сохранить", "Save"))) b->triggerClick();
         snap ("gallery-with-picture.png");
     }
+
+    // ---- sandbox, categories, zoom, folder list
+    std::function<GalleryGrid* (Component&)> findGrid2 = [&] (Component& c) -> GalleryGrid*
+    {
+        for (auto* ch : c.getChildren())
+        {
+            if (auto* gg = dynamic_cast<GalleryGrid*> (ch)) return gg;
+            if (auto* r = findGrid2 (*ch)) return r;
+        }
+        return nullptr;
+    };
+    auto cardKeys = [&]
+    {
+        StringArray k;
+        if (auto* grid = findGrid2 (*mc))
+            for (auto* ch : grid->getChildren())
+                if (auto* card = dynamic_cast<PluginCard*> (ch)) k.add (card->key);
+        return k;
+    };
+    int failures = 0;
+    auto check = [&] (bool ok, const String& what) { std::cout << (ok ? "  ok   " : "  FAIL ") << what << "\n"; if (! ok) ++failures; };
+    {
+        const auto k = cardKeys();
+        check (! k.contains ("vital") && ! k.contains ("oldfreereverb") && k.contains ("serum2"), "sandboxed plugins are not in the gallery (" + String (k.size()) + " cards)");
+        if (auto* b = findButton (*mc, tr ("Песочница", "Sandbox") + " 2")) b->triggerClick();
+        else check (false, "sandbox chip with a count");
+        snap ("gallery-sandbox.png");
+        const auto s = cardKeys();
+        check (s.size() == 2 && s.contains ("vital"), "sandbox shows only the hidden ones");
+        if (auto* b = findButton (*mc, tr ("Все", "All"))) b->triggerClick();
+        check (allCategories().contains (String::fromUTF8 ("Для вокала")), "custom category loaded");
+    }
+    mc->zoomBy (1.7f);
+    snap ("gallery-zoom.png");
+    mc->zoomBy (1.0f, true);
+    if (auto* b = findButton (*mc, tr ("Статистика", "Stats"))) b->triggerClick();
+    snap ("stats-folders.png");
+    {
+        FolderList* plugins = nullptr;
+        std::function<void (Component&)> collect = [&] (Component& c)
+        {
+            for (auto* ch : c.getChildren())
+            {
+                if (auto* fl = dynamic_cast<FolderList*> (ch)) plugins = fl;   // the plugin list is added last
+                collect (*ch);
+            }
+        };
+        collect (*mc);
+        if (plugins != nullptr)
+        {
+            const int before = plugins->getHeight();
+            auto src = Desktop::getInstance().getMainMouseSource();
+            const Point<float> pos (40.0f, 42.0f + 4.5f * 22.0f);
+            MouseEvent me (src, pos, {}, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, plugins, plugins, Time::getCurrentTime(), pos, Time::getCurrentTime(), 1, false);
+            plugins->mouseMove (me);
+            plugins->mouseUp (me);
+            snap ("stats-folders-open.png");
+            check (plugins->getHeight() > before + 60, "the folder list opens to show every folder (" + String (before) + " -> " + String (plugins->getHeight()) + ")");
+        }
+        else check (false, "folder list found");
+    }
+    mc->zoomBy (1.45f);
+    snap ("stats-zoom.png");
+    mc->zoomBy (1.0f, true);
+    std::cout << (failures == 0 ? "ALL PASSED" : "FAILURES: " + String (failures)) << "\n";
 
     Library lib;
     ScanResult sr;

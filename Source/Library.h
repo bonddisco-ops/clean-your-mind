@@ -29,6 +29,7 @@ struct Plugin
 
     // what the user set
     bool favorite = false;
+    bool hidden = false;            // in the sandbox: never shown in the gallery
     PluginType userType = PluginType::Unknown;
     juce::String userCategory;      // empty = automatic
     juce::String dragFormat;        // empty = use the global priority
@@ -46,8 +47,10 @@ struct Plugin
     juce::String formatsText() const;
 };
 
-// Categories shown in the filter (stable ids are the Russian labels themselves)
-const juce::StringArray& allCategories();
+// Categories shown in the filter: the built-in ones (stable ids are the Russian labels themselves)
+// followed by the ones the user made
+juce::StringArray allCategories();
+const juce::StringArray& builtInCategories();
 
 struct ProjectRecord
 {
@@ -93,6 +96,10 @@ public:
     int staleMonths = 12;
     juce::String themeName { "Asphalt" };
     juce::String lang { "ru" };
+    juce::StringArray customCategories;
+    float galleryZoom = 1.0f, statsZoom = 1.0f;     // Ctrl + mouse wheel
+    bool addCategory (const juce::String& name);
+    void removeCategory (const juce::String& name);
 
     std::vector<Plugin> plugins;
     std::map<juce::String, ProjectRecord> projectCache;
@@ -122,7 +129,7 @@ public:
     int projectCount() const { return (int) projectCache.size(); }
 
 private:
-    struct UserMeta { bool favorite = false; int type = -1; juce::String category, dragFormat, name; };
+    struct UserMeta { bool favorite = false, hidden = false; int type = -1; juce::String category, dragFormat, name; };
     std::map<juce::String, UserMeta> meta;
     void captureMeta();
 };

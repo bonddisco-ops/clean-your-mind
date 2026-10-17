@@ -58,7 +58,7 @@ public:
     explicit Chip (const juce::String& text = {}, bool pill = true);
 };
 
-enum class Icon { Refresh, Theme, Settings, Folder, Plus, Cross, Star, Camera, Back, Search, Reveal, Box, Globe };
+enum class Icon { Refresh, Theme, Settings, Folder, Plus, Cross, Star, Camera, Back, Search, Reveal, Box, Globe, Ban };
 juce::Path iconPath (Icon);
 
 class IconButton : public juce::Button
@@ -72,6 +72,10 @@ public:
     bool primary = false;
 };
 
+// Small text prompt (OK / Cancel); the callback gets the text when OK is pressed
+void askForText (const juce::String& title, const juce::String& message, const juce::String& initial,
+                 std::function<void (const juce::String&)> onOk);
+
 //==============================================================================
 struct AppState
 {
@@ -84,6 +88,8 @@ struct AppState
     std::function<void (int index)> restore;
     std::function<void()> rescan;
     std::function<void (const juce::String& msg)> toast;
+    std::function<void()> categoriesChanged;
+    void newCategory (std::function<void (const juce::String&)> then = {});
 
     juce::Image thumbFor (const juce::String& key);
     juce::String lastUsedText (const Plugin&, bool longYear = false) const;
@@ -110,12 +116,14 @@ public:
     juce::String key;
     bool dropHighlight = false;
     static constexpr float imageAspect = 252.0f / 132.0f;
-    static int heightForWidth (int w);
+    static int heightForWidth (int w, float zoom);
 
 private:
     AppState& app;
     bool hover = false, dragStarted = false;
     juce::Rectangle<float> starArea() const;
+    juce::Rectangle<float> hideArea() const;
+    float zoom() const { return app.lib.galleryZoom; }
     juce::Rectangle<float> imageArea() const;
     void showMenu();
     Plugin* plugin() const { return app.lib.find (key); }
@@ -156,18 +164,19 @@ public:
 private:
     AppState& app;
     juce::TextEditor search;
-    Chip all, inst, fx, fav, noImg;
+    Chip all, inst, fx, fav, noImg, sandbox;
     juce::ComboBox category, sort;
     juce::Viewport view;
     GalleryGrid grid;
     juce::String status;
-    int typeFilter = 0;
+    int typeFilter = 0, lastCategoryId = 1;
+    static constexpr int newCategoryId = 9999;
     void timerCallback() override { stopTimer(); refresh(); }
     void setTypeFilter (int);
 };
 
 //==============================================================================
-class FolderList : public juce::Component
+class FolderList : public juce::Component, public juce::SettableTooltipClient
 {
 public:
     FolderList (AppState&, bool projects);
@@ -178,12 +187,18 @@ public:
     void mouseUp (const juce::MouseEvent&) override;
     int idealHeight() const;
     void updateTexts();
+    std::function<void()> onHeightChanged;
 
 private:
     AppState& app;
-    bool projects;
+    bool projects, expanded = false;
+    static constexpr int collapsedRows = 5;
     Chip add;
     int hoverRow = -1;
+    int rowH() const;
+    int shownFolders() const;           // folder rows drawn
+    bool hasToggleRow() const;          // "... and N more" / "show less"
+    int totalRows() const { return shownFolders() + (hasToggleRow() ? 1 : 0); }
     std::unique_ptr<juce::FileChooser> chooser;
     juce::Array<juce::File>& folders();
     juce::Rectangle<int> rowBounds (int i) const;
@@ -202,7 +217,18 @@ private:
     AppState& app;
     Chip fAll, fOften, fStale, fNever, fDelete, fQuarantine;
     Chip m6, m12, m24;
-    juce::ListBox list;
+    struct ZoomList : public juce::ListBox
+    {
+        // Ctrl + wheel goes up to the window (zoom) instead of scrolling the list
+        void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& w) override
+        {
+            if (e.mods.isCtrlDown() || e.mods.isCommandDown()) Component::mouseWheelMove (e, w);
+            else ListBox::mouseWheelMove (e, w);
+        }
+    };
+    ZoomList list;
+    juce::Viewport sideView;
+    juce::Component sideContent;
     FolderList pluginFolders, projectFolders;
     int filter = 0, sortCol = 2;
     bool sortAsc = false;
@@ -215,6 +241,8 @@ private:
     void mouseUp (const juce::MouseEvent&) override;
     void setFilter (int);
     void columnLayout (int w, int* x) const;
+public:
+    void applyZoom();
 };
 
 //==============================================================================
@@ -258,6 +286,8 @@ public:
     void paintOverChildren (juce::Graphics&) override;
     void resized() override;
     bool keyPressed (const juce::KeyPress&) override;
+    void mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails&) override;
+    void zoomBy (float factor, bool reset = false);
 
 private:
     AppState app;
@@ -273,6 +303,7 @@ private:
     juce::String toastText;
     juce::uint32 toastUntil = 0;
     bool scanning = false;
+    juce::uint32 zoomSaveAt = 0;
 
     class ScanJob;
     std::unique_ptr<ScanJob> job;

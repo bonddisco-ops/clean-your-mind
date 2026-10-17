@@ -74,6 +74,7 @@ MainComponent::MainComponent()
         repaint();
     };
     app.rescan = [this] { startScan(); };
+    app.categoriesChanged = [this] { gallery.updateTexts(); app.refreshAll(); };
     app.toast = [this] (const String& m)
     {
         toastText = m;
@@ -329,6 +330,11 @@ void MainComponent::resized()
 
 void MainComponent::timerCallback()
 {
+    if (zoomSaveAt != 0 && Time::getMillisecondCounter() > zoomSaveAt)
+    {
+        zoomSaveAt = 0;
+        app.lib.saveSettings();
+    }
     if (scanning || (toastText.isNotEmpty() && Time::getMillisecondCounter() < toastUntil + 300))
         repaint();
 }
@@ -383,8 +389,48 @@ bool MainComponent::pasteImage()
     return true;
 }
 
+void MainComponent::mouseWheelMove (const MouseEvent& e, const MouseWheelDetails& w)
+{
+    // Ctrl (Cmd on Mac) + wheel: bigger or smaller pictures and lists. Viewports and lists
+    // pass these events up instead of scrolling.
+    if ((e.mods.isCtrlDown() || e.mods.isCommandDown()) && crop == nullptr && std::abs (w.deltaY) > 0.0001f)
+    {
+        const float d = jlimit (-0.5f, 0.5f, w.deltaY);
+        zoomBy (std::exp (d * 0.9f));
+    }
+}
+
+void MainComponent::zoomBy (float factor, bool reset)
+{
+    auto& z = page == 0 ? app.lib.galleryZoom : app.lib.statsZoom;
+    const float nz = reset ? 1.0f : jlimit (0.6f, 2.5f, z * factor);
+    if (std::abs (nz - z) < 0.0005f)
+        return;
+    z = nz;
+    if (page == 0) gallery.resized();
+    else stats.applyZoom();
+    app.toast (tr ("Масштаб ", "Zoom ") + String (roundToInt (z * 100.0f)) + "%   " + tr ("(Ctrl+0 = обычный)", "(Ctrl+0 = normal)"));
+    zoomSaveAt = Time::getMillisecondCounter() + 800;
+}
+
 bool MainComponent::keyPressed (const KeyPress& k)
 {
+    if (k == KeyPress ('=', ModifierKeys::commandModifier, 0) || k == KeyPress ('+', ModifierKeys::commandModifier, 0)
+        || k == KeyPress (KeyPress::numberPadAdd, ModifierKeys::commandModifier, 0))
+    {
+        zoomBy (1.15f);
+        return true;
+    }
+    if (k == KeyPress ('-', ModifierKeys::commandModifier, 0) || k == KeyPress (KeyPress::numberPadSubtract, ModifierKeys::commandModifier, 0))
+    {
+        zoomBy (1.0f / 1.15f);
+        return true;
+    }
+    if (k == KeyPress ('0', ModifierKeys::commandModifier, 0) || k == KeyPress (KeyPress::numberPad0, ModifierKeys::commandModifier, 0))
+    {
+        zoomBy (1.0f, true);
+        return true;
+    }
     if (k == KeyPress ('v', ModifierKeys::commandModifier, 0))
         return pasteImage();
     if (k == KeyPress::escapeKey && crop != nullptr)
